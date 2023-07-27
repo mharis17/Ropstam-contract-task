@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "hardhat/console.sol";
+
+contract RopstamToken is ERC20,Ownable {
+
+    uint256 public constant INITIAL_SUPPLY = 1000000 * (10**18); // 1,000,000 tokens
+    uint256 public constant BURN_RATE = 2; // 2% burn rate on each transfer
+    uint256 public constant TOKEN_PRICE = 100 wei; // Price to buy 1 Ropstam token in Wei
+
+    constructor() ERC20("Ropstam", "RPM") {
+        //Minting initail supply to the contract address owner does not hold any amount initially
+        _mint(address(this), INITIAL_SUPPLY);
+    }
+
+
+     // Buy Ropstam tokens with Ether (Wei)
+    function buyTokens(uint256 _NumberOfTokens) external payable {
+        
+        uint256 amountToBuy=_NumberOfTokens* TOKEN_PRICE;
+        console.log(amountToBuy,"amount to buy ");
+        console.log(msg.value,"apna balance");
+        require (msg.value == amountToBuy,"insufficient Balance");
+
+        //Only transfering upon buying not minting to control supply 
+        _transfer(address(this), msg.sender, _NumberOfTokens); // Transfer tokens from contract to buyer
+    }
+
+     // Transfer tokens with a deflationary mechanism
+     // As this is the deflationary 2% of the supply burns
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal  override {
+        uint256 burnAmount = amount*(BURN_RATE)/(100); // Calculate the burn amount
+        uint256 transferAmount = amount-burnAmount; // Calculate the amount to transfer
+
+        super._burn(sender, burnAmount); // Burn tokens from the sender
+        super._transfer(sender, recipient, transferAmount); // Transfer remaining tokens
+    }
+
+      // Function to allow users to burn their own tokens
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
+    //Only owner of the contract can withdraw the ETH earned 
+    function withdraw() public onlyOwner {
+       uint amount = address(this).balance;
+        (bool success, ) = payable(owner()).call {
+            value: amount
+        }("");
+        require(success, "Failed to send Ether");
+        
+    }
+
+   
+}
