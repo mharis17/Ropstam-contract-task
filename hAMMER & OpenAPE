@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+
+
+contract HammerToken is ERC20 {
+      IERC721 OpenApesToken;
+    //this supply is minted on owner wallet he can transfer tokens 
+    constructor(address _OpenApesToken ) ERC20("Hammer", "HAMR") {
+        _mint(msg.sender, 1000000000000000000000000); // Mint 1,000,000 HAMR tokens to the contract deployer
+        OpenApesToken=IERC721(_OpenApesToken);
+    }
+
+      // Function to mint Hammer tokens
+    function buyHammerTokens(uint256 amount) external {
+        //iT WILL NOT ALLOW USER TO MINT NEW TOKEN IF THEY POSSES OPENAPE NFT
+        require(OpenApesToken.balanceOf(msg.sender) == 0, "Insufficient Open APES tOKEN");
+        _mint(_msgSender(), amount);
+    }
+}
+
+contract OpenApesToken is ERC721Enumerable, Ownable {
+    using Strings for uint256;
+    uint256 maxSupply=10000;
+    uint256 perNft= 100;//ropstam token
+    uint256 private _tokenIdCounter;
+    mapping(uint256 => string) private _tokenURIs;
+    HammerToken public hammerToken;
+    IERC20 ropstamToken;
+
+    event NFTPurchase(address indexed buyer, uint256 noOftokenId);
+    
+    constructor(address hammerTokenAddress,address _RopstamToken) ERC721("Open Apes", "OAP") {
+        hammerToken = HammerToken(hammerTokenAddress);
+        _tokenIdCounter = 1;
+        ropstamToken=IERC20(_RopstamToken);
+    }
+  
+
+//Main mint function with particular checks
+//Hammer token holder will not be able to mint 
+//Balance of rosptam token should be 100 atleast for 1 token
+
+        function mint(address TO,uint chosenAmount) public payable   {
+        require (hammerToken.balanceOf(msg.sender)> 0,"you have hammer tokenn");
+        require (ropstamToken.balanceOf(msg.sender)==chosenAmount*perNft,"Do not have Enough Ropstam token");
+        require(chosenAmount > 0, "Number of tokens can not be less than or equal to 0");
+        require(maxSupply>=totalSupply()+chosenAmount,"Quantity is greater than remainig base supply");
+        for (uint i = 0; i < chosenAmount; i++) {
+        _tokenIdCounter++;
+        _safeMint(TO, totalSupply());
+        }
+        emit NFTPurchase(msg.sender,chosenAmount);
+        }
+
+    //just a eaxmple pic 
+    function _baseURI() internal pure override returns (string memory) {
+        return "https://beige-rude-earwig-802.mypinata.cloud/ipfs/QmQ4zPpNaquV7F15WjCT3LmWopwSnHQXM19kpXshXC9GQC";
+    }
+    
+    //RETURN THE TOKEN URI of the ID
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        return string(abi.encodePacked(_baseURI(), tokenId.toString()));
+    }
+
+
+    //to SET NEW OWNER OF THE CONTRACT 
+
+    function setOwner (address _newOwner) public onlyOwner{
+     transferOwnership(_newOwner);
+     
+    }
+ //Only owner of the contract can withdraw the ETH earned 
+    function withdraw() public onlyOwner {
+       uint amount = address(this).balance;
+        (bool success, ) = payable(owner()).call {
+            value: amount
+        }("");
+        require(success, "Failed to send Ether");
+        
+    }
+
+
+
+}
+
+
